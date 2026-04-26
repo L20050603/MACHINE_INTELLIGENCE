@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BP 手写数字识别</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace">
+        <div class="draw-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Back Propagation MNIST Lab</p>
+              <h1>BP 手写数字识别</h1>
+            </div>
+            <span id="modelStatus" class="status">连接中</span>
+          </div>
+
+          <div class="canvas-wrap">
+            <canvas id="digitCanvas" width="280" height="280" aria-label="手写数字画板"></canvas>
+          </div>
+
+          <div class="toolbar">
+            <label class="control">
+              <span>笔粗</span>
+              <input id="brushSize" type="range" min="10" max="34" value="22" />
+            </label>
+            <button id="clearBtn" type="button">清空</button>
+            <button id="predictBtn" type="button" class="primary">识别</button>
+          </div>
+        </div>
+
+        <aside class="result-panel">
+          <div class="prediction">
+            <span class="label">预测结果</span>
+            <strong id="prediction">-</strong>
+            <small id="confidence">等待输入</small>
+          </div>
+
+          <div class="bars" id="bars"></div>
+
+          <div class="mini-grid">
+            <div>
+              <span>预处理</span>
+              <canvas id="previewCanvas" width="112" height="112"></canvas>
+            </div>
+            <div>
+              <span>Top 3</span>
+              <ol id="topList"></ol>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="notes">
+        <article>
+          <h2>实验主线</h2>
+          <p>NumPy 实现 BP 前向传播、交叉熵、反向传播、Adam 更新和 Dropout，前端画板把输入归一化为 28x28 后交给后端模型。</p>
+        </article>
+        <article>
+          <h2>自主创新</h2>
+          <p>强化学习式增强控制器把多种增强策略视为动作，用 epsilon-greedy bandit 根据验证集收益自动选择更有效的数据增强。</p>
+        </article>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
+
