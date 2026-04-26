@@ -63,11 +63,12 @@ class ConvNet(nn.Module):
 
 # --- 训练逻辑包装类 ---
 class MNISTExpert:
-    def __init__(self, lr=0.001):
+    def __init__(self, lr=0.001, data_dir="./data"):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = ConvNet().to(self.device)
         self.optimizer = optim.AdamW(self.model.parameters(), lr=lr, weight_decay=1e-4)
         self.criterion = nn.CrossEntropyLoss()
+        self.data_dir = data_dir
         
         # 数据增强 (对应你原代码中的 ImageAugmenter)
         self.transform = transforms.Compose([
@@ -79,7 +80,7 @@ class MNISTExpert:
 
     def train_model(self, epochs=10, batch_size=64):
         train_loader = DataLoader(
-            datasets.MNIST('./data', train=True, download=True, transform=self.transform),
+            datasets.MNIST(self.data_dir, train=True, download=True, transform=self.transform),
             batch_size=batch_size, shuffle=True
         )
         
@@ -107,7 +108,7 @@ class MNISTExpert:
 
     def evaluate(self):
         test_loader = DataLoader(
-            datasets.MNIST('./data', train=False, transform=transforms.Compose([
+            datasets.MNIST(self.data_dir, train=False, transform=transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Normalize((0.1307,), (0.3081,))
             ])), batch_size=1000

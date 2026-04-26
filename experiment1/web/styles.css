@@ -27,7 +27,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -116,6 +117,39 @@ h1 {
   background: #eef2f6;
 }
 
+.model-bar {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.model-select {
+  display: grid;
+  gap: 6px;
+}
+
+.model-select span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.model-select select {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--ink);
+}
+
+#modelNote {
+  color: var(--muted);
+  line-height: 1.45;
+  padding-bottom: 9px;
+}
+
 #digitCanvas {
   width: min(100%, 420px);
   aspect-ratio: 1;
@@ -169,7 +203,7 @@ button.primary {
 .result-panel {
   padding: 22px;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr auto auto;
   gap: 18px;
 }
 
@@ -258,6 +292,99 @@ button.primary {
   line-height: 1.9;
 }
 
+.gan-widget {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfe;
+}
+
+.gan-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.gan-head span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.gan-head strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+}
+
+.pill {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.pill.ready {
+  color: #07624f;
+  border-color: #8bd2bd;
+  background: #ecfbf5;
+}
+
+.pill.warn {
+  color: #9a481e;
+  border-color: #f0b68d;
+  background: #fff5ec;
+}
+
+.gan-controls {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 8px;
+}
+
+.gan-controls select {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #fff;
+}
+
+.gan-controls button {
+  min-height: 38px;
+}
+
+.gan-preview {
+  margin-top: 10px;
+  min-height: 80px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+}
+
+.gan-preview img {
+  width: 100%;
+  max-height: 74px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.gan-preview img:not([src]) {
+  display: none;
+}
+
+.gan-preview small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 .notes {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -292,5 +419,12 @@ button.primary {
   .control {
     grid-column: 1 / -1;
   }
-}
 
+  .model-bar {
+    grid-template-columns: 1fr;
+  }
+
+  #modelNote {
+    padding-bottom: 0;
+  }
+}

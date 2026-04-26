@@ -1,8 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from Net import Net
-from ImageAugmenter import ImageAugmenter
-import MathTools
+import sys
+from pathlib import Path
+
+PROJECT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_DIR))
+
+from core.Net import Net
+from core.ImageAugmenter import ImageAugmenter
+from core import MathTools
 import torch
 import torchvision
 import torchvision.transforms as transforms

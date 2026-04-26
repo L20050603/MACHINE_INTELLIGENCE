@@ -1,12 +1,13 @@
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Tuple
 
 import numpy as np
 
-from ImageAugmenter import ImageAugmenter
-from MathTools import cross_entropy
-from Net import Net
+from .ImageAugmenter import ImageAugmenter
+from .MathTools import cross_entropy
+from .Net import Net
 
 
 AugmentConfig = Dict[str, Dict[str, object]]
@@ -113,7 +114,8 @@ def train_bp_with_rl_augmentation(
     epochs: int = 5,
     batch_size: int = 64,
     lr: float = 0.001,
-    save_path: str = "mnist_model.npy",
+    save_path: str = "artifacts/mnist_model.npy",
+    history_path: str = "artifacts/rl_augmentation_history.json",
 ) -> Tuple[Net, List[Dict[str, object]]]:
     """Train the NumPy BP model while a bandit agent learns augmentation policy choice."""
 
@@ -161,8 +163,9 @@ def train_bp_with_rl_augmentation(
             f"| loss={row['avg_loss']:.4f} | val_acc={val_acc:.4f} | reward={reward:+.4f}"
         )
 
+    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(history_path).parent.mkdir(parents=True, exist_ok=True)
     model.save_model(save_path)
-    with open("rl_augmentation_history.json", "w", encoding="utf-8") as f:
+    with open(history_path, "w", encoding="utf-8") as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
     return model, history
-

@@ -18,6 +18,14 @@
             <span id="modelStatus" class="status">连接中</span>
           </div>
 
+          <div class="model-bar">
+            <label class="model-select">
+              <span>模型权重</span>
+              <select id="modelSelect"></select>
+            </label>
+            <small id="modelNote">正在检测可用模型</small>
+          </div>
+
           <div class="canvas-wrap">
             <canvas id="digitCanvas" width="280" height="280" aria-label="手写数字画板"></canvas>
           </div>
@@ -51,17 +59,46 @@
               <ol id="topList"></ol>
             </div>
           </div>
+
+          <section class="gan-widget" aria-label="ACGAN 生成窗口">
+            <div class="gan-head">
+              <div>
+                <span>ACGAN</span>
+                <strong>生成样本</strong>
+              </div>
+              <span id="ganStatus" class="pill">检测中</span>
+            </div>
+            <div class="gan-controls">
+              <select id="ganDigit" aria-label="选择生成数字">
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+              </select>
+              <button id="ganGenerateBtn" type="button">生成</button>
+            </div>
+            <div class="gan-preview">
+              <img id="ganImage" alt="ACGAN 生成的 MNIST 样本" />
+              <small id="ganMessage">等待生成器</small>
+            </div>
+          </section>
         </aside>
       </section>
 
       <section class="notes">
         <article>
-          <h2>实验主线</h2>
-          <p>NumPy 实现 BP 前向传播、交叉熵、反向传播、Adam 更新和 Dropout，前端画板把输入归一化为 28x28 后交给后端模型。</p>
+          <h2>模型对比</h2>
+          <p>前端可以切换纯 MLP、CNN、RL 增强 BP 和 ACGAN 增强 BP 权重，比较不同反向传播模型的识别结果。</p>
         </article>
         <article>
-          <h2>自主创新</h2>
-          <p>强化学习式增强控制器把多种增强策略视为动作，用 epsilon-greedy bandit 根据验证集收益自动选择更有效的数据增强。</p>
+          <h2>创新设计</h2>
+          <p>强化学习负责选择训练增强策略，ACGAN 负责生成带标签样本，主分类器仍围绕 BP 训练展开。</p>
         </article>
       </section>
     </main>
