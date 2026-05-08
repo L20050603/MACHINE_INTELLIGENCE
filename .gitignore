@@ -5,6 +5,7 @@ server.*.log
 experiment1/artifacts/
 experiment1/data/
 experiment1/generated/
+experiment2/artifacts/
 *.pth
 *.npy
 rl_augmentation_history.json

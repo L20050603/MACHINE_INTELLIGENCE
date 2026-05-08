@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>A* 8 数码实验</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="panel controls">
+        <div class="title-block">
+          <p class="eyebrow">Experiment 2</p>
+          <h1>A* 8 数码问题</h1>
+        </div>
+
+        <label>
+          初始状态
+          <input id="start" value="2 8 3 1 6 4 7 0 5" />
+        </label>
+
+        <label>
+          目标状态
+          <input id="goal" value="1 2 3 8 0 4 7 6 5" />
+        </label>
+
+        <div class="row">
+          <label>
+            启发函数
+            <select id="heuristic">
+              <option value="pattern_db">Pattern Database</option>
+              <option value="linear_conflict">Linear Conflict</option>
+              <option value="manhattan">Manhattan</option>
+              <option value="misplaced">Misplaced</option>
+            </select>
+          </label>
+
+          <label>
+            权重
+            <input id="weight" type="number" step="0.1" min="0.1" value="1.0" />
+          </label>
+        </div>
+
+        <label>
+          最大扩展节点
+          <input id="maxExpanded" type="number" min="1" value="200000" />
+        </label>
+
+        <div class="buttons">
+          <button id="solveBtn">求解</button>
+          <button id="compareBtn" class="secondary">对比启发函数</button>
+        </div>
+
+        <p id="status" class="status">等待输入。</p>
+      </section>
+
+      <section class="panel board-panel">
+        <div class="panel-header">
+          <h2>路径演示</h2>
+          <div class="step-control">
+            <button id="prevBtn" class="secondary">上一步</button>
+            <span id="stepLabel">Step 0 / 0</span>
+            <button id="nextBtn" class="secondary">下一步</button>
+          </div>
+        </div>
+
+        <div id="board" class="board"></div>
+        <p id="moveLabel" class="move-label">移动序列会显示在这里。</p>
+      </section>
+
+      <section class="panel result-panel">
+        <h2>搜索统计</h2>
+        <div class="stats">
+          <div><span>是否找到</span><strong id="found">-</strong></div>
+          <div><span>步数</span><strong id="depth">-</strong></div>
+          <div><span>扩展节点</span><strong id="expanded">-</strong></div>
+          <div><span>生成节点</span><strong id="generated">-</strong></div>
+          <div><span>开放表峰值</span><strong id="frontier">-</strong></div>
+          <div><span>耗时</span><strong id="elapsed">-</strong></div>
+        </div>
+
+        <h2>启发函数对比</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>启发函数</th>
+                <th>步数</th>
+                <th>扩展</th>
+                <th>生成</th>
+                <th>耗时</th>
+              </tr>
+            </thead>
+            <tbody id="compareBody">
+              <tr><td colspan="5">点击“对比启发函数”。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
