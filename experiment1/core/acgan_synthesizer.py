@@ -12,49 +12,83 @@ from torchvision.utils import save_image
 from .mnist_downloader import ensure_mnist_available
 
 
+# ──────────────────────────────────────────────
+# Conditional Batch Normalization (P2)
+# ──────────────────────────────────────────────
+
+class ConditionalBatchNorm1d(nn.Module):
+    """BatchNorm1d modulated by class label: gamma(y) * BN(x) + beta(y)."""
+
+    def __init__(self, num_features, num_classes, embed_dim=16):
+        super().__init__()
+        self.bn = nn.BatchNorm1d(num_features)
+        self.embed = nn.Embedding(num_classes, embed_dim)
+        self.gamma = nn.Linear(embed_dim, num_features)
+        self.beta = nn.Linear(embed_dim, num_features)
+        # start as identity: gamma=1, beta=0
+        nn.init.constant_(self.gamma.weight, 0.0)
+        nn.init.constant_(self.gamma.bias, 1.0)
+        nn.init.constant_(self.beta.weight, 0.0)
+        nn.init.constant_(self.beta.bias, 0.0)
+
+    def forward(self, x, labels):
+        out = self.bn(x)
+        gamma = self.gamma(self.embed(labels))
+        beta = self.beta(self.embed(labels))
+        return gamma * out + beta
+
+
+# ──────────────────────────────────────────────
+# Generator (P2: ConditionalBatchNorm)
+# ──────────────────────────────────────────────
+
 class ConditionalGenerator(nn.Module):
     def __init__(self, noise_dim=96, num_classes=10, embed_dim=16):
         super().__init__()
         self.label_embed = nn.Embedding(num_classes, embed_dim)
-        self.net = nn.Sequential(
-            nn.Linear(noise_dim + embed_dim, 256),
-            nn.BatchNorm1d(256),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(256, 512),
-            nn.BatchNorm1d(512),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(512, 1024),
-            nn.BatchNorm1d(1024),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(1024, 28 * 28),
-            nn.Tanh(),
-        )
+
+        self.fc1 = nn.Linear(noise_dim + embed_dim, 256)
+        self.cbn1 = ConditionalBatchNorm1d(256, num_classes)
+        self.fc2 = nn.Linear(256, 512)
+        self.cbn2 = ConditionalBatchNorm1d(512, num_classes)
+        self.fc3 = nn.Linear(512, 1024)
+        self.cbn3 = ConditionalBatchNorm1d(1024, num_classes)
+        self.fc4 = nn.Linear(1024, 28 * 28)
 
     def forward(self, noise, labels):
         x = torch.cat([noise, self.label_embed(labels)], dim=1)
-        return self.net(x).view(-1, 1, 28, 28)
+        x = F.leaky_relu(self.cbn1(self.fc1(x), labels), 0.2, inplace=True)
+        x = F.leaky_relu(self.cbn2(self.fc2(x), labels), 0.2, inplace=True)
+        x = F.leaky_relu(self.cbn3(self.fc3(x), labels), 0.2, inplace=True)
+        x = self.fc4(x)
+        return torch.tanh(x).view(-1, 1, 28, 28)
 
+
+# ──────────────────────────────────────────────
+# Discriminator (P1: Spectral Normalization)
+# ──────────────────────────────────────────────
 
 class AuxiliaryDiscriminator(nn.Module):
     def __init__(self, num_classes=10):
         super().__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=4, stride=2, padding=1),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(64),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Flatten(),
-            nn.Linear(64 * 7 * 7, 256),
-            nn.LeakyReLU(0.2, inplace=True),
-        )
-        self.validity = nn.Linear(256, 1)
+        self.conv1 = nn.utils.spectral_norm(nn.Conv2d(1, 32, 4, 2, 1))
+        self.conv2 = nn.utils.spectral_norm(nn.Conv2d(32, 64, 4, 2, 1))
+        self.bn = nn.BatchNorm2d(64)
+        self.fc1 = nn.utils.spectral_norm(nn.Linear(64 * 7 * 7, 256))
+        self.validity = nn.utils.spectral_norm(nn.Linear(256, 1))
         self.classifier = nn.Linear(256, num_classes)
 
     def forward(self, images):
-        feat = self.features(images)
+        feat = F.leaky_relu(self.conv1(images), 0.2, inplace=True)
+        feat = F.leaky_relu(self.bn(self.conv2(feat)), 0.2, inplace=True)
+        feat = feat.flatten(1)
+        feat = F.leaky_relu(self.fc1(feat), 0.2, inplace=True)
         return self.validity(feat), self.classifier(feat)
 
+
+# ──────────────────────────────────────────────
+# Helpers
+# ──────────────────────────────────────────────
 
 def _to_model_space(images):
     return images * 2.0 - 1.0
@@ -86,6 +120,10 @@ def load_acgan(checkpoint_path, device=None):
     discriminator.eval()
     return generator, discriminator, noise_dim, device
 
+
+# ──────────────────────────────────────────────
+# Training (P0: hinge loss, label smoothing, class weight)
+# ──────────────────────────────────────────────
 
 def train_acgan(
     data_dir="./data",
@@ -122,29 +160,41 @@ def train_acgan(
             images = images.to(device)
             labels = labels.to(device)
             batch = images.size(0)
-            real_targets = torch.ones(batch, 1, device=device)
-            fake_targets = torch.zeros(batch, 1, device=device)
 
+            # ── generate fakes ──
             noise = torch.randn(batch, noise_dim, device=device)
             fake_labels = torch.randint(0, 10, (batch,), device=device)
             fake_images = generator(noise, fake_labels)
 
+            # ── train discriminator ──
             opt_d.zero_grad()
+
             real_validity, real_class = discriminator(images)
             fake_validity, fake_class = discriminator(fake_images.detach())
-            d_real = F.binary_cross_entropy_with_logits(real_validity, real_targets)
-            d_fake = F.binary_cross_entropy_with_logits(fake_validity, fake_targets)
-            d_cls_real = F.cross_entropy(real_class, labels)
-            d_cls_fake = F.cross_entropy(fake_class, fake_labels)
-            d_loss = d_real + d_fake + 0.5 * (d_cls_real + d_cls_fake)
+
+            # P0: hinge adversarial loss
+            d_adv_real = F.relu(1.0 - real_validity).mean()
+            d_adv_fake = F.relu(1.0 + fake_validity).mean()
+
+            # P1: label smoothing on classifier
+            d_cls_real = F.cross_entropy(real_class, labels, label_smoothing=0.1)
+            d_cls_fake = F.cross_entropy(fake_class, fake_labels, label_smoothing=0.1)
+
+            d_loss = d_adv_real + d_adv_fake + d_cls_real + d_cls_fake
             d_loss.backward()
             opt_d.step()
 
+            # ── train generator ──
             opt_g.zero_grad()
+
             validity, class_logits = discriminator(fake_images)
-            g_adv = F.binary_cross_entropy_with_logits(validity, real_targets)
+
+            # P0: hinge generator loss
+            g_adv = -validity.mean()
+            # P0: triple class loss weight to force label respect
             g_cls = F.cross_entropy(class_logits, fake_labels)
-            g_loss = g_adv + g_cls
+            g_loss = g_adv + 3.0 * g_cls
+
             g_loss.backward()
             opt_g.step()
 
@@ -169,6 +219,10 @@ def train_acgan(
     )
     return generator
 
+
+# ──────────────────────────────────────────────
+# Generation utilities (unchanged API)
+# ──────────────────────────────────────────────
 
 @torch.no_grad()
 def save_digit_grid(generator, path, noise_dim=96, device=None):

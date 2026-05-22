@@ -17,7 +17,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train BP with ACGAN-generated MNIST samples.")
     parser.add_argument("--data-dir", default=str(PROJECT_DIR / "data"))
     parser.add_argument("--gan-dir", default=str(PROJECT_DIR / "artifacts" / "generated"))
-    parser.add_argument("--gan-epochs", type=int, default=3)
+    parser.add_argument("--gan-epochs", type=int, default=5)
     parser.add_argument("--bp-epochs", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=0.001)
