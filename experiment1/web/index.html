@@ -27,13 +27,13 @@
           </div>
 
           <div class="canvas-wrap">
-            <canvas id="digitCanvas" width="280" height="280" aria-label="手写数字画板"></canvas>
+            <canvas id="digitCanvas" width="560" height="560" aria-label="手写数字画板"></canvas>
           </div>
 
           <div class="toolbar">
             <label class="control">
               <span>笔粗</span>
-              <input id="brushSize" type="range" min="10" max="34" value="22" />
+              <input id="brushSize" type="range" min="20" max="68" value="44" />
             </label>
             <button id="clearBtn" type="button">清空</button>
             <button id="predictBtn" type="button" class="primary">识别</button>
@@ -54,9 +54,10 @@
               <span>预处理</span>
               <canvas id="previewCanvas" width="112" height="112"></canvas>
             </div>
-            <div>
-              <span>Top 3</span>
+            <div id="top3Box">
+              <span>Top 3 排名</span>
               <ol id="topList"></ol>
+              <small class="chart-hint">点击查看扇形图</small>
             </div>
           </div>
 
@@ -94,7 +95,7 @@
       <section class="notes">
         <article>
           <h2>模型对比</h2>
-          <p>前端可以切换纯 MLP、CNN、RL 增强 BP 和 ACGAN 增强 BP 权重，比较不同反向传播模型的识别结果。</p>
+          <p>前端可以切换 BP、增强版BP、强化学习增强版BP、ACGAN增强版BP 和 CNN/Residual BP 权重，比较不同反向传播模型的识别结果。</p>
         </article>
         <article>
           <h2>创新设计</h2>
@@ -102,6 +103,15 @@
         </article>
       </section>
     </main>
+
+    <div id="donutModal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-panel">
+        <button class="modal-close" aria-label="关闭">&times;</button>
+        <h3>概率扇形图</h3>
+        <div id="modalDonut"></div>
+      </div>
+    </div>
+
     <script src="app.js"></script>
   </body>
 </html>

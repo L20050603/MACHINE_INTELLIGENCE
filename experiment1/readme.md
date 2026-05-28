@@ -36,22 +36,26 @@ MACHINE_INTELLIGENCE/
       mnist_data.py               MNIST 加载与 one-hot 转换
       mnist_downloader.py         MNIST 下载兜底工具
       Net2.py                     PyTorch CNN/Residual 对照模型
-    scripts/                      可直接运行的训练脚本
-      train_bp.py                 纯 BP/MLP baseline 训练
-      train_rl_bp.py              BP + 强化学习增强训练
+    scripts/                      训练脚本
+      train_baseline_bp.py        原始 BP（无增强）
+      train_bp.py                 增强版 BP（归一化 + Dropout + Adam）
+      train_rl_bp.py              强化学习增强版 BP
       train_gan_augmented_bp.py   ACGAN 生成增强 + BP 训练
-      train_cnn.py                PyTorch CNN/Residual 对照模型训练
-      main.py                     原始 BP 实验入口
+      train_cnn.py                CNN/Residual 对照模型
+      _train_rl_gpu_100ep.py      GPU 加速 100epoch RL 训练（含对比图）
+      generate_plots.py           生成实验对比图
     web/                          前端页面
       index.html
       styles.css
       app.js
-    artifacts/                    训练产物目录，运行后自动生成
-      mnist_model.npy
-      rl_augmentation_history.json
-      generated/
-        acgan_mnist.pth
-        acgan_epoch_01.png
+    artifacts/                    训练产物目录（运行后自动生成）
+      models/                     模型权重（前端加载）
+      acgan/                      ACGAN 权重、样本图、loss 曲线
+        samples_100epoch/         每 epoch 生成样本图
+      experiments/                实验结果
+        20epoch/                  5 模型 × 20 轮实验
+        100epoch/                 5 模型 × 100 轮实验
+          comparison/             准确率对比图
 ```
 
 ## 环境准备
@@ -79,9 +83,9 @@ pip install -r requirements.txt
 
 说明：如果你已经有可用环境，只需要在仓库根目录执行 `pip install -r requirements.txt` 即可。
 
-## 方法一：训练纯 BP/MLP baseline
+## 方法一：训练增强版BP
 
-如果只想训练原始 NumPy BP 网络，可以运行：
+如果只想训练增强版 BP 网络（归一化 + Dropout + Adam），可以运行：
 
 ```bash
 cd experiment1
@@ -124,17 +128,17 @@ python scripts/train_bp.py --epochs 120 --hidden-layers 512,256,128 --dropout 0.
 | `--val-size` | `5000` | 从训练集中划分多少样本作为验证集。 |
 | `--limit-train` | 无 | 限制训练集大小，调试时使用。 |
 | `--limit-test` | 无 | 限制测试集大小，调试时使用。 |
-| `--save-path` | `artifacts/models/mlp_baseline.npy` | 模型保存路径。 |
+| `--save-path` | `artifacts/models/enhanced_bp.npy` | 模型保存路径。 |
 
 默认输出：
 
 ```text
-experiment1/artifacts/models/mlp_baseline.npy
+experiment1/artifacts/models/enhanced_bp.npy
 ```
 
-这个脚本适合作为 baseline，对比 RL 增强和 ACGAN 增强方法。
+这个脚本适合作为 baseline，对比各类增强方法。
 
-## 方法二：训练 BP + 强化学习增强
+## 方法二：训练强化学习增强版BP
 
 强化学习部分使用 **Multi-Armed Bandit** 中的 **epsilon-greedy** 策略。
 
@@ -182,14 +186,15 @@ python scripts/train_rl_bp.py --epochs 50
 
 | 参数 | 默认值 | 作用 |
 | --- | --- | --- |
-| `--epochs` | `5` | RL 增强 BP 的训练轮数。 |
+| `--epochs` | `5` | 强化学习增强版BP 的训练轮数。 |
 | `--batch-size` | `64` | mini-batch 大小。 |
 | `--lr` | `0.001` | BP 网络学习率。 |
 | `--val-size` | `5000` | 验证集大小，reward 根据验证集准确率变化计算。 |
 | `--limit-train` | 无 | 限制训练集大小，用于快速调试。 |
 | `--limit-test` | 无 | 限制测试集大小，用于快速调试。 |
-| `--save-path` | `artifacts/models/mlp_rl.npy` | 强化学习增强 BP 权重保存路径。 |
+| `--save-path` | `artifacts/models/rl_enhanced_bp.npy` | 强化学习增强版BP 权重保存路径。 |
 | `--history-path` | `artifacts/rl_augmentation_history.json` | 保存每轮策略选择、loss、reward、验证准确率。 |
+| `--output-dir` | 无 | 指定后将模型、历史记录和图表一起保存到该目录。 |
 
 强化学习内部参数目前写在 `core/rl_augmenter.py` 中：
 
@@ -198,12 +203,12 @@ python scripts/train_rl_bp.py --epochs 50
 | `epsilon` | `0.25` | 初始探索概率。 |
 | `decay` | `0.96` | 每轮后 epsilon 衰减倍率。 |
 | `min_epsilon` | `0.05` | 最低探索概率。 |
-| `reward` | 当前验证准确率 - 历史最佳验证准确率 | 衡量本轮增强策略是否有帮助。 |
+| `reward` | `(当前验证准确率 - 最佳验证准确率) × 100` | 百分比提升作为奖励信号。 |
 
 默认输出：
 
 ```text
-experiment1/artifacts/models/mlp_rl.npy
+experiment1/artifacts/models/rl_enhanced_bp.npy
 experiment1/artifacts/rl_augmentation_history.json
 ```
 
@@ -234,9 +239,9 @@ python scripts/train_gan_augmented_bp.py --gan-epochs 3 --bp-epochs 5 --syntheti
 默认输出：
 
 ```text
-experiment1/artifacts/generated/acgan_mnist.pth
-experiment1/artifacts/generated/acgan_epoch_01.png
-experiment1/artifacts/models/mlp_gan.npy
+experiment1/artifacts/acgan/acgan_mnist.pth
+experiment1/artifacts/acgan/samples_100epoch/acgan_epoch_01.png
+experiment1/artifacts/models/acgan_enhanced_bp.npy
 ```
 
 参数说明：
@@ -252,8 +257,8 @@ experiment1/artifacts/models/mlp_gan.npy
 | `--retrain-gan` | 关闭状态 | 即使已有 `acgan_mnist.pth`，也强制重新训练生成器。 |
 | `--limit-train` | 无 | 限制真实训练集大小，便于快速调试。 |
 | `--data-dir` | `experiment1/data` | MNIST 数据目录。 |
-| `--gan-dir` | `artifacts/generated` | ACGAN 权重与样例图保存目录。 |
-| `--save-path` | `artifacts/models/mlp_gan.npy` | ACGAN 增强 BP 模型保存路径。 |
+| `--gan-dir` | `artifacts/acgan` | ACGAN 权重与样例图保存目录。 |
+| `--save-path` | `artifacts/models/acgan_enhanced_bp.npy` | ACGAN增强版BP 模型保存路径。 |
 
 快速调试示例：
 
@@ -262,7 +267,7 @@ cd experiment1
 python scripts/train_gan_augmented_bp.py --limit-train 10000 --gan-epochs 1 --bp-epochs 2 --synthetic-per-class 50
 ```
 
-注意：如果 `artifacts/generated/acgan_mnist.pth` 已经存在，脚本默认会复用已有生成器，不会重复训练 ACGAN。如果想重新训练生成器，可以加 `--retrain-gan`。
+注意：如果 `artifacts/acgan/acgan_mnist.pth` 已经存在，脚本默认会复用已有生成器，不会重复训练 ACGAN。如果想重新训练生成器，可以加 `--retrain-gan`。
 
 如果发现“选择数字 8 却生成像 7 的样本”，说明 ACGAN 的条件生成质量还不够稳定。可以尝试：
 
@@ -271,7 +276,7 @@ cd experiment1
 python scripts/train_gan_augmented_bp.py --retrain-gan --gan-epochs 50 --bp-epochs 80 --synthetic-per-class 500 --synthetic-min-confidence 0.7
 ```
 
-前端显示“ACGAN 已加载”只表示找到了生成器权重，不代表生成质量一定好。建议观察 `artifacts/generated/acgan_epoch_*.png`，现在样例图按“每行一个数字类别”保存，更容易检查各类别质量。
+前端显示”ACGAN 已加载”只表示找到了生成器权重，不代表生成质量一定好。建议观察 `artifacts/acgan/samples_100epoch/acgan_epoch_*.png`，现在样例图按”每行一个数字类别”保存，更容易检查各类别质量。
 
 ## 方法四：训练 CNN/Residual 对照模型
 
@@ -318,20 +323,19 @@ http://127.0.0.1:8000
 页面功能：
 
 - 在左侧画板手写数字。
-- 在“模型权重”下拉框中选择纯 MLP、CNN、RL 增强 BP 或 ACGAN 增强 BP。
-- 点击“识别”，后端调用 NumPy BP 模型预测。
+- 在”模型权重”下拉框中选择 BP、增强版BP、强化学习增强版BP、ACGAN增强版BP 或 CNN/Residual BP。
+- 点击”识别”，后端调用对应模型预测。
 - 右侧显示预测结果、置信度、10 类概率条和 Top 3。
 - 预处理窗口显示浏览器端缩放到 28x28 后的输入。
 - 右侧底部 ACGAN 小窗口可以选择数字并生成合成样本。
 
 前端模型加载规则：
 
-- 纯 MLP：`experiment1/artifacts/models/mlp_baseline.npy`
-- 强化学习增强 BP：`experiment1/artifacts/models/mlp_rl.npy`
-- ACGAN 增强 BP：`experiment1/artifacts/models/mlp_gan.npy`
-- CNN/Residual：`experiment1/artifacts/models/cnn_residual.pth`
-- 兼容旧权重：`experiment1/artifacts/mnist_model.npy`
-- ACGAN 生成器默认查找：`experiment1/artifacts/generated/acgan_mnist.pth`
+- 增强版BP：`experiment1/artifacts/models/enhanced_bp.npy`
+- 强化学习增强版BP：`experiment1/artifacts/models/rl_enhanced_bp.npy`
+- ACGAN增强版BP：`experiment1/artifacts/models/acgan_enhanced_bp.npy`
+- CNN/Residual BP：`experiment1/artifacts/models/cnn_residual.pth`
+- ACGAN 生成器默认查找：`experiment1/artifacts/acgan/acgan_mnist.pth`
 
 如果页面显示“未训练”，说明对应权重文件还没有生成。先运行训练脚本即可。
 
@@ -350,14 +354,14 @@ cd experiment1
 python scripts/train_rl_bp.py --epochs 5
 ```
 
-训练纯 BP baseline：
+训练增强版BP：
 
 ```bash
 cd experiment1
 python scripts/train_bp.py --epochs 10
 ```
 
-训练 ACGAN 增强版 BP：
+训练 ACGAN增强版BP：
 
 ```bash
 cd experiment1
@@ -398,12 +402,12 @@ python scripts/train_gan_augmented_bp.py --help
 6. 创新点一：强化学习 bandit 自动选择增强策略。
 7. 创新点二：ACGAN 生成带标签样本，扩充训练集。
 8. 前端系统：画板输入、28x28 预处理、后端预测、结果可视化。
-9. 对照实验：基础 BP、RL 增强 BP、ACGAN 增强 BP、PyTorch CNN。
+9. 对照实验：BP、增强版BP、强化学习增强版BP、ACGAN增强版BP、CNN/Residual BP。
 10. 结果分析：准确率、loss 曲线、生成样本质量、不同增强方式的影响。
 
 ## 常见问题
 
-**1. 为什么运行前端后显示“未训练”？**
+**1. 为什么运行前端后显示”未训练”？**
 
 说明还没有生成任何可用模型权重。先运行一个训练脚本，例如：
 
@@ -412,11 +416,11 @@ cd experiment1
 python scripts/train_rl_bp.py --epochs 5
 ```
 
-训练后的主要权重会保存到 `experiment1/artifacts/models/`。旧版兼容权重 `experiment1/artifacts/mnist_model.npy` 仍可被前端识别，但推荐使用新的 `artifacts/models/` 结构。
+训练后的主要权重会保存到 `experiment1/artifacts/models/`。
 
-**2. 为什么 ACGAN 小窗口显示“未训练”？**
+**2. 为什么 ACGAN 小窗口显示”未训练”？**
 
-说明还没有生成 `experiment1/artifacts/generated/acgan_mnist.pth`。运行：
+说明还没有生成 `experiment1/artifacts/acgan/acgan_mnist.pth`。运行：
 
 ```bash
 cd experiment1

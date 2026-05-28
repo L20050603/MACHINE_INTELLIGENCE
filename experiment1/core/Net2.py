@@ -1,3 +1,5 @@
+import json
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -78,33 +80,65 @@ class MNISTExpert:
             transforms.Normalize((0.1307,), (0.3081,))
         ])
 
-    def train_model(self, epochs=10, batch_size=64):
-        train_loader = DataLoader(
-            datasets.MNIST(self.data_dir, train=True, download=True, transform=self.transform),
-            batch_size=batch_size, shuffle=True
-        )
-        
-        # 学习率调度器：模拟你代码中的 lr *= 0.5
-        scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=5, gamma=0.5)
+    def train_model(self, epochs=10, batch_size=64, metrics_file=None):
+        train_dataset = datasets.MNIST(self.data_dir, train=True, download=True, transform=self.transform)
+        # Reserve 5000 for validation
+        val_size = min(5000, len(train_dataset) // 5)
+        train_subset = torch.utils.data.Subset(train_dataset, range(val_size, len(train_dataset)))
+        val_subset = torch.utils.data.Subset(train_dataset, range(val_size))
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_subset, batch_size=1000, shuffle=False)
+
+        test_transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307,), (0.3081,))
+        ])
+
+        # 学习率调度器：每 7 轮衰减为原来的 0.5
+        scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=7, gamma=0.5)
+        history = {"train_loss": [], "val_acc": []}
 
         self.model.train()
         for epoch in range(epochs):
             total_loss = 0
             for batch_idx, (data, target) in enumerate(train_loader):
                 data, target = data.to(self.device), target.to(self.device)
-                
+
                 self.optimizer.zero_grad()
                 output = self.model(data)
                 loss = self.criterion(output, target)
                 loss.backward()
                 self.optimizer.step()
-                
+
                 total_loss += loss.item()
                 if batch_idx % 200 == 0:
                     print(f'Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}] Loss: {loss.item():.4f}')
-            
+
             scheduler.step()
-            print(f"--- Epoch {epoch} Avg Loss: {total_loss/len(train_loader):.4f} ---")
+            avg_loss = total_loss / len(train_loader)
+            history["train_loss"].append(avg_loss)
+
+            # Evaluate on val set
+            self.model.eval()
+            correct = 0
+            total = 0
+            with torch.no_grad():
+                for data, target in val_loader:
+                    data, target = data.to(self.device), target.to(self.device)
+                    output = self.model(data)
+                    correct += output.argmax(dim=1).eq(target).sum().item()
+                    total += target.size(0)
+            val_acc = correct / total
+            history["val_acc"].append(val_acc)
+            self.model.train()
+
+            print(f"--- Epoch {epoch:2d} | Train Loss: {avg_loss:.4f} | Val Acc: {val_acc:.4f} ---")
+
+            if metrics_file:
+                with open(metrics_file, "w") as f:
+                    json.dump(history, f)
+
+        return history
 
     def evaluate(self):
         test_loader = DataLoader(

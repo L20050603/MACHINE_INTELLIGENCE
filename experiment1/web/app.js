@@ -10,6 +10,10 @@ const predictionEl = document.querySelector("#prediction");
 const confidenceEl = document.querySelector("#confidence");
 const barsEl = document.querySelector("#bars");
 const topList = document.querySelector("#topList");
+const top3Box = document.querySelector("#top3Box");
+const donutModal = document.querySelector("#donutModal");
+const modalDonut = document.querySelector("#modalDonut");
+const modalClose = document.querySelector(".modal-close");
 const modelSelect = document.querySelector("#modelSelect");
 const modelNote = document.querySelector("#modelNote");
 const ganStatus = document.querySelector("#ganStatus");
@@ -28,9 +32,11 @@ function resetCanvas() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   predictionEl.textContent = "-";
   confidenceEl.textContent = "等待输入";
-  topList.innerHTML = "";
+  showTop3List(null);
+  cachedProbabilities = null;
   drawBars(Array(10).fill(0));
   drawPreview(Array(784).fill(0));
+  donutModal.classList.remove("open");
 }
 
 function canvasPoint(event) {
@@ -181,6 +187,188 @@ function drawBars(probabilities) {
   });
 }
 
+let cachedTop3 = null;
+let cachedProbabilities = null;
+
+function showTop3List(top3) {
+  cachedTop3 = top3;
+  topList.innerHTML = "";
+
+  if (!top3 || top3.length === 0) {
+    topList.innerHTML = '<li style="color:var(--muted)">—</li>';
+    top3Box.classList.remove("has-results");
+    return;
+  }
+
+  top3Box.classList.add("has-results");
+  const colors = ["#315f9e", "#d4552d", "#0b7a75"];
+
+  top3.forEach((item, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <span class="rank-dot" style="background:${colors[i]}"></span>
+      <span class="rank-label">${item.label}</span>
+      <span class="rank-pct">${(item.probability * 100).toFixed(1)}%</span>
+    `;
+    topList.appendChild(li);
+  });
+}
+
+function buildDonutArc(cx, cy, outerR, innerR, cosS, sinS, cosE, sinE, large) {
+  const x1 = cx + outerR * cosS, y1 = cy + outerR * sinS;
+  const x2 = cx + outerR * cosE, y2 = cy + outerR * sinE;
+  const x3 = cx + innerR * cosE, y3 = cy + innerR * sinE;
+  const x4 = cx + innerR * cosS, y4 = cy + innerR * sinS;
+  return `M${x1.toFixed(1)} ${y1.toFixed(1)} A${outerR} ${outerR} 0 ${large} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} L${x3.toFixed(1)} ${y3.toFixed(1)} A${innerR} ${innerR} 0 ${large} 0 ${x4.toFixed(1)} ${y4.toFixed(1)} Z`;
+}
+
+function buildFullDonutPath(cx, cy, outerR, innerR, cosS, sinS, cosM, sinM, cosE, sinE) {
+  return buildDonutArc(cx, cy, outerR, innerR, cosS, sinS, cosM, sinM, 1)
+    + " " + buildDonutArc(cx, cy, outerR, innerR, cosM, sinM, cosE, sinE, 1);
+}
+
+function drawModalDonut(probabilities) {
+  modalDonut.innerHTML = "";
+
+  if (!probabilities || probabilities.length === 0) return;
+
+  // Digits with prob >= 1% shown individually, rest grouped as "其他"
+  const raw = probabilities
+    .map((prob, digit) => ({ label: String(digit), prob }))
+    .filter((item) => item.prob > 0.0001)
+    .sort((a, b) => b.prob - a.prob);
+
+  const segments = [];
+  let otherProb = 0;
+
+  raw.forEach((item) => {
+    if (item.prob >= 0.01) {
+      segments.push(item);
+    } else {
+      otherProb += item.prob;
+    }
+  });
+
+  if (otherProb > 0.0001) {
+    segments.push({ label: "其他", prob: otherProb });
+  }
+
+  if (segments.length === 0) return;
+
+  const total = segments.reduce((s, item) => s + item.prob, 0);
+  const colors = [
+    "#315f9e", "#d4552d", "#0b7a75", "#7b4ea3", "#c47d2d",
+    "#4a8c5c", "#b8456e", "#5c7a8c", "#9e6b3e", "#6c8cbf",
+  ];
+
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 540 540");
+
+  const cx = 270, cy = 270, outerR = 108, innerR = 54;
+  let startAngle = -Math.PI / 2;
+
+  // Five-tier label radii — wider spread to prevent overlap
+  const labelTiers = [
+    outerR + 42, outerR + 62, outerR + 82, outerR + 102, outerR + 122,
+  ];
+
+  segments.forEach((item, i) => {
+    const fraction = item.prob / total;
+    const sweep = fraction * Math.PI * 2;
+    const endAngle = startAngle + sweep;
+    const midAngle = startAngle + sweep / 2;
+
+    const cosS = Math.cos(startAngle), sinS = Math.sin(startAngle);
+    const cosE = Math.cos(endAngle), sinE = Math.sin(endAngle);
+    const cosM = Math.cos(midAngle), sinM = Math.sin(midAngle); // midpoint for full-circle split
+
+    // Full-circle arcs (>= ~358°) must be split into two 180° halves
+    // because SVG A commands cannot draw a complete circle (start == end)
+    const fullCircle = sweep > Math.PI * 1.999;
+    const d = fullCircle
+      ? buildFullDonutPath(cx, cy, outerR, innerR, cosS, sinS, cosM, sinM, cosE, sinE)
+      : buildDonutArc(cx, cy, outerR, innerR, cosS, sinS, cosE, sinE, sweep > Math.PI ? 1 : 0);
+
+    const path = document.createElementNS(NS, "path");
+    path.setAttribute("d", d);
+    path.setAttribute("fill", colors[i % colors.length]);
+    path.setAttribute("stroke", "#fff");
+    path.setAttribute("stroke-width", "2");
+    svg.appendChild(path);
+
+    // All labels outside — 5-tier stagger to prevent overlap
+    const labelR = labelTiers[i % 5];
+    const lx = cx + labelR * Math.cos(midAngle);
+    const ly = cy + labelR * Math.sin(midAngle);
+    const edgeX = cx + (outerR + 2) * Math.cos(midAngle);
+    const edgeY = cy + (outerR + 2) * Math.sin(midAngle);
+
+    // Connector line
+    const line = document.createElementNS(NS, "polyline");
+    line.setAttribute("points", `${edgeX.toFixed(1)},${edgeY.toFixed(1)} ${lx.toFixed(1)},${ly.toFixed(1)}`);
+    line.setAttribute("stroke", "#b0b8c4");
+    line.setAttribute("stroke-width", "0.8");
+    line.setAttribute("fill", "none");
+    svg.appendChild(line);
+
+    const pct = (item.prob * 100).toFixed(1);
+    const anchor = lx > cx + 4 ? "start" : lx < cx - 4 ? "end" : "middle";
+    const ox = anchor === "start" ? 4 : anchor === "end" ? -4 : 0;
+
+    const t2 = document.createElementNS(NS, "text");
+    t2.setAttribute("x", (lx + ox).toFixed(1));
+    t2.setAttribute("y", (ly - 16).toFixed(1));
+    t2.setAttribute("text-anchor", anchor);
+    t2.setAttribute("fill", "#c0392b");
+    t2.setAttribute("font-size", "12");
+    t2.setAttribute("font-weight", "bold");
+    t2.setAttribute("font-family", "Microsoft YaHei, Segoe UI, sans-serif");
+    t2.textContent = pct + "%";
+    svg.appendChild(t2);
+
+    const t1 = document.createElementNS(NS, "text");
+    t1.setAttribute("x", (lx + ox).toFixed(1));
+    t1.setAttribute("y", (ly + 4).toFixed(1));
+    t1.setAttribute("text-anchor", anchor);
+    t1.setAttribute("fill", "#17202a");
+    t1.setAttribute("font-size", "15");
+    t1.setAttribute("font-weight", "bold");
+    t1.setAttribute("font-family", "Microsoft YaHei, Segoe UI, sans-serif");
+    t1.textContent = item.label;
+    svg.appendChild(t1);
+
+    startAngle = endAngle;
+  });
+
+  // Center label
+  const center = document.createElementNS(NS, "text");
+  center.setAttribute("x", cx.toString());
+  center.setAttribute("y", cy.toString());
+  center.setAttribute("text-anchor", "middle");
+  center.setAttribute("dominant-baseline", "central");
+  center.setAttribute("fill", "#17202a");
+  center.setAttribute("font-size", "15");
+  center.setAttribute("font-weight", "bold");
+  center.setAttribute("font-family", "Microsoft YaHei, Segoe UI, sans-serif");
+  center.textContent = segments.length <= 5 ? "概率分布" : "10 类";
+  svg.appendChild(center);
+
+  modalDonut.appendChild(svg);
+}
+
+function openModal() {
+  if (!cachedProbabilities || cachedProbabilities.length === 0) return;
+  drawModalDonut(cachedProbabilities);
+  donutModal.classList.add("open");
+  donutModal.setAttribute("aria-hidden", "false");
+}
+
+function closeModal() {
+  donutModal.classList.remove("open");
+  donutModal.setAttribute("aria-hidden", "true");
+}
+
 function selectedModel() {
   return modelSelect.value;
 }
@@ -209,12 +397,13 @@ async function predict() {
     predictionEl.textContent = result.prediction;
     confidenceEl.textContent = `${model ? model.name : result.modelId}，置信度 ${(result.confidence * 100).toFixed(2)}%`;
     drawBars(result.probabilities);
-    topList.innerHTML = result.top3
-      .map((item) => `<li>${item.label}: ${(item.probability * 100).toFixed(2)}%</li>`)
-      .join("");
+    showTop3List(result.top3);
+    cachedProbabilities = result.probabilities;
   } catch (error) {
     predictionEl.textContent = "!";
     confidenceEl.textContent = error.message;
+    showTop3List(null);
+    cachedProbabilities = null;
   } finally {
     predictBtn.disabled = false;
   }
@@ -268,12 +457,18 @@ async function checkHealth() {
     ganGenerateBtn.disabled = !generatorReady;
     ganMessage.textContent = generatorReady ? "选择数字生成" : "未找到 ACGAN 权重";
   } catch {
+    models = [];
+    modelSelect.innerHTML = "";
+    predictionEl.textContent = "-";
+    confidenceEl.textContent = "等待输入";
     statusEl.textContent = "离线";
     statusEl.className = "status warn";
     modelNote.textContent = "服务未连接";
     ganStatus.textContent = "离线";
     ganStatus.className = "pill warn";
     ganGenerateBtn.disabled = true;
+    generatorReady = false;
+    predictBtn.disabled = true;
   }
 }
 
@@ -284,6 +479,15 @@ clearBtn.addEventListener("click", resetCanvas);
 predictBtn.addEventListener("click", predict);
 modelSelect.addEventListener("change", updateModelNote);
 ganGenerateBtn.addEventListener("click", generateDigit);
+
+top3Box.addEventListener("click", openModal);
+modalClose.addEventListener("click", closeModal);
+donutModal.addEventListener("click", (e) => {
+  if (e.target === donutModal) closeModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && donutModal.classList.contains("open")) closeModal();
+});
 
 resetCanvas();
 checkHealth();
