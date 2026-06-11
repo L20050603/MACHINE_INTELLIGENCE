@@ -16,26 +16,36 @@ ARTIFACTS_ROOT = ROOT / "artifacts"
 MODEL_ROOT = ARTIFACTS_ROOT / "models"
 
 MODEL_REGISTRY = {
-    "mlp_baseline": {
-        "name": "纯 MLP / NumPy BP",
+    "bp": {
+        "name": "BP",
         "type": "mlp",
-        "path": MODEL_ROOT / "mlp_baseline.npy",
-        "note": "手写 BP + Dropout + Adam",
+        "path": MODEL_ROOT / "bp.npy",
+        "note": "原始反向传播，无归一化，无增强",
+        "normalize": False,
     },
-    "mlp_rl": {
-        "name": "强化学习增强 BP",
+    "enhanced_bp": {
+        "name": "增强版BP",
         "type": "mlp",
-        "path": MODEL_ROOT / "mlp_rl.npy",
+        "path": MODEL_ROOT / "enhanced_bp.npy",
+        "note": "归一化 + Dropout + Adam + LR衰减",
+        "normalize": True,
+    },
+    "rl_enhanced_bp": {
+        "name": "强化学习增强版BP",
+        "type": "mlp",
+        "path": MODEL_ROOT / "rl_enhanced_bp.npy",
         "note": "epsilon-greedy 选择增强策略",
+        "normalize": True,
     },
-    "mlp_gan": {
-        "name": "ACGAN 增强 BP",
+    "acgan_enhanced_bp": {
+        "name": "ACGAN增强版BP",
         "type": "mlp",
-        "path": MODEL_ROOT / "mlp_gan.npy",
+        "path": MODEL_ROOT / "acgan_enhanced_bp.npy",
         "note": "真实样本 + ACGAN 合成样本",
+        "normalize": True,
     },
     "cnn_residual": {
-        "name": "CNN / Residual BP",
+        "name": "CNN/Residual BP",
         "type": "cnn",
         "path": MODEL_ROOT / "cnn_residual.pth",
         "note": "PyTorch CNN，仍由反向传播训练",
@@ -44,6 +54,7 @@ MODEL_REGISTRY = {
 
 LEGACY_MODEL_PATH = ARTIFACTS_ROOT / "mnist_model.npy"
 GENERATOR_CANDIDATES = [
+    ARTIFACTS_ROOT / "acgan" / "acgan_mnist.pth",
     ARTIFACTS_ROOT / "generated" / "acgan_mnist.pth",
     ROOT / "generated" / "acgan_mnist.pth",
 ]
@@ -86,10 +97,10 @@ def _available_models():
 
 
 def _default_model_id():
-    for model_id in ("mlp_baseline", "mlp_rl", "mlp_gan", "cnn_residual", "legacy"):
+    for model_id in ("bp", "enhanced_bp", "rl_enhanced_bp", "acgan_enhanced_bp", "cnn_residual", "legacy"):
         if _model_path(model_id).exists():
             return model_id
-    return "mlp_baseline"
+    return "bp"
 
 
 def _model_path(model_id):
@@ -109,7 +120,11 @@ def _model_type(model_id):
 def _load_mlp(path):
     cache_key = ("mlp", str(path))
     if cache_key not in MODEL_CACHE:
-        model = Net(input_size=784, output_size=10, linears=[128, 64])
+        # Auto-detect architecture from saved file
+        saved = np.load(str(path), allow_pickle=True).item()
+        layer_dims = [saved["layers"][0]["W"].shape[0]] + [l["W"].shape[1] for l in saved["layers"]]
+        linears = layer_dims[1:-1]  # exclude input (784) and output (10)
+        model = Net(input_size=784, output_size=10, linears=linears)
         model.load_model(str(path))
         MODEL_CACHE[cache_key] = model
     return MODEL_CACHE[cache_key]
@@ -177,9 +192,11 @@ def _pool_probs(probs):
     return pooled / np.sum(pooled)
 
 
-def _predict_mlp(path, pixels):
+def _predict_mlp(path, pixels, normalize=True):
     model = _load_mlp(path)
     batch = np.stack([np.clip(v.reshape(784), 0.0, 1.0) for v in _variants(pixels)]).astype(np.float32)
+    if normalize:
+        batch = (batch - 0.1307) / 0.3081
     return _pool_probs(model.predict(batch))
 
 
@@ -200,9 +217,10 @@ def _predict(model_id, pixels):
     path = _model_path(model_id)
     if not path.exists():
         raise FileNotFoundError(f"Model weights not found: {path}")
+    normalize = MODEL_REGISTRY.get(model_id, {}).get("normalize", True)
     if _model_type(model_id) == "cnn":
         return _predict_cnn(path, pixels)
-    return _predict_mlp(path, pixels)
+    return _predict_mlp(path, pixels, normalize=normalize)
 
 
 GENERATOR_PATH, GENERATOR_READY = _find_generator()

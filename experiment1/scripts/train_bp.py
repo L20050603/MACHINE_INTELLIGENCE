@@ -14,7 +14,7 @@ def parse_hidden_layers(value):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train the baseline NumPy BP/MLP model.")
+    parser = argparse.ArgumentParser(description="Train the enhanced BP/MLP model with normalization and dropout.")
     parser.add_argument("--data-dir", default=str(PROJECT_DIR / "data"))
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=64)
@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument("--val-size", type=int, default=5000)
     parser.add_argument("--limit-train", type=int, default=None)
     parser.add_argument("--limit-test", type=int, default=None)
-    parser.add_argument("--save-path", default=str(PROJECT_DIR / "artifacts" / "models" / "mlp_baseline.npy"))
+    parser.add_argument("--save-path", default=str(PROJECT_DIR / "artifacts" / "models" / "enhanced_bp.npy"))
     parser.add_argument("--no-augmentation", action="store_true")
     parser.add_argument("--hidden-layers", default="256,128,64")
     parser.add_argument("--dropout", type=float, default=0.1)

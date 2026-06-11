@@ -237,13 +237,25 @@ button.primary {
 
 .bar {
   display: grid;
-  grid-template-columns: 24px 1fr 50px;
-  gap: 8px;
+  grid-template-columns: 22px 1fr 56px;
+  gap: 6px;
   align-items: center;
   font-size: 13px;
 }
 
+.bar strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar .track + span {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .track {
+  display: block;
   height: 12px;
   border-radius: 999px;
   background: #e9edf2;
@@ -251,6 +263,7 @@ button.primary {
 }
 
 .fill {
+  display: block;
   height: 100%;
   width: 0%;
   border-radius: inherit;
@@ -288,8 +301,19 @@ button.primary {
 
 #topList {
   margin: 0;
-  padding-left: 24px;
+  padding: 0;
+  list-style: none;
   line-height: 1.9;
+}
+
+#topList li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#topList .rank-pct {
+  margin-left: auto;
 }
 
 .gan-widget {
@@ -404,6 +428,120 @@ button.primary {
 .notes p {
   color: var(--muted);
   line-height: 1.7;
+}
+
+/* ---- Top 3 ranking ---- */
+
+#top3Box {
+  cursor: default;
+}
+
+#top3Box.has-results {
+  cursor: pointer;
+}
+
+#top3Box.has-results:hover {
+  background: #f7f9fc;
+}
+
+.rank-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.rank-label {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.rank-pct {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chart-hint {
+  display: block;
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---- Donut modal ---- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 32, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+.modal-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-panel {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 28px 24px 24px;
+  width: min(560px, calc(100vw - 40px));
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  box-shadow: 0 24px 80px rgba(31, 42, 55, 0.28);
+  position: relative;
+}
+
+.modal-panel h3 {
+  margin: 0 0 16px;
+  font-size: 20px;
+  color: var(--ink);
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: none;
+  font-size: 24px;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.modal-close:hover {
+  background: #eef1f5;
+  color: var(--ink);
+}
+
+#modalDonut {
+  display: grid;
+  place-items: center;
+}
+
+#modalDonut svg {
+  width: 100%;
+  max-width: 500px;
+  height: auto;
 }
 
 @media (max-width: 860px) {

@@ -16,7 +16,7 @@ from core.Net import Net
 def parse_args():
     parser = argparse.ArgumentParser(description="Train BP with ACGAN-generated MNIST samples.")
     parser.add_argument("--data-dir", default=str(PROJECT_DIR / "data"))
-    parser.add_argument("--gan-dir", default=str(PROJECT_DIR / "artifacts" / "generated"))
+    parser.add_argument("--gan-dir", default=str(PROJECT_DIR / "artifacts" / "acgan"))
     parser.add_argument("--gan-epochs", type=int, default=5)
     parser.add_argument("--bp-epochs", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=64)
@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument("--synthetic-min-confidence", type=float, default=0.0)
     parser.add_argument("--retrain-gan", action="store_true")
     parser.add_argument("--limit-train", type=int, default=None)
-    parser.add_argument("--save-path", default=str(PROJECT_DIR / "artifacts" / "models" / "mlp_gan.npy"))
+    parser.add_argument("--save-path", default=str(PROJECT_DIR / "artifacts" / "models" / "acgan_enhanced_bp.npy"))
     return parser.parse_args()
 
 

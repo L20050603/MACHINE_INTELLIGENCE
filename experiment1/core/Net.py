@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 
 from .ImageAugmenter import ImageAugmenter
@@ -40,10 +42,11 @@ class Net:
             self.cache.append({"A": A, "Z": Z, "mask": mask if i < len(self.layers) - 1 else None})
         return A
 
-    def backward(self, y_true, lr=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8):
+    def backward(self, y_true, lr=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8, optimizer="adam"):
         m = y_true.shape[0]
         self.t += 1
         dz = self.cache[-1]["A"] - y_true
+        use_sgd = (optimizer == "sgd")
 
         for i in reversed(range(len(self.layers))):
             layer = self.layers[i]
@@ -59,18 +62,22 @@ class Net:
             else:
                 dz_prev = None
 
-            layer["mW"] = beta1 * layer["mW"] + (1 - beta1) * dW
-            layer["mb"] = beta1 * layer["mb"] + (1 - beta1) * db
-            layer["vW"] = beta2 * layer["vW"] + (1 - beta2) * (dW ** 2)
-            layer["vb"] = beta2 * layer["vb"] + (1 - beta2) * (db ** 2)
+            if use_sgd:
+                layer["W"] -= lr * dW
+                layer["b"] -= lr * db
+            else:
+                layer["mW"] = beta1 * layer["mW"] + (1 - beta1) * dW
+                layer["mb"] = beta1 * layer["mb"] + (1 - beta1) * db
+                layer["vW"] = beta2 * layer["vW"] + (1 - beta2) * (dW ** 2)
+                layer["vb"] = beta2 * layer["vb"] + (1 - beta2) * (db ** 2)
 
-            mW_hat = layer["mW"] / (1 - beta1 ** self.t)
-            mb_hat = layer["mb"] / (1 - beta1 ** self.t)
-            vW_hat = layer["vW"] / (1 - beta2 ** self.t)
-            vb_hat = layer["vb"] / (1 - beta2 ** self.t)
+                mW_hat = layer["mW"] / (1 - beta1 ** self.t)
+                mb_hat = layer["mb"] / (1 - beta1 ** self.t)
+                vW_hat = layer["vW"] / (1 - beta2 ** self.t)
+                vb_hat = layer["vb"] / (1 - beta2 ** self.t)
 
-            layer["W"] -= lr * mW_hat / (np.sqrt(vW_hat) + epsilon)
-            layer["b"] -= lr * mb_hat / (np.sqrt(vb_hat) + epsilon)
+                layer["W"] -= lr * mW_hat / (np.sqrt(vW_hat) + epsilon)
+                layer["b"] -= lr * mb_hat / (np.sqrt(vb_hat) + epsilon)
 
             if dz_prev is not None:
                 dz = dz_prev
@@ -87,10 +94,15 @@ class Net:
         dropout_rate=0.1,
         lr_decay_step=0,
         lr_decay_gamma=0.5,
+        x_val=None,
+        y_val=None,
+        metrics_file=None,
+        optimizer="adam",
     ):
         n_samples = len(x_train)
         current_lr = lr
         augmenter = ImageAugmenter(image_shape=(28, 28), random_seed=42)
+        history = {"train_loss": [], "val_acc": []}
 
         for epoch in range(epochs):
             if lr_decay_step and epoch > 0 and epoch % lr_decay_step == 0:
@@ -110,7 +122,7 @@ class Net:
                     xb = augmenter.augment_batch(xb)
 
                 y_pred = self.forward(xb, training=True, dropout_rate=dropout_rate)
-                self.backward(yb, current_lr)
+                self.backward(yb, current_lr, optimizer=optimizer)
                 running_loss += cross_entropy(yb, y_pred)
                 n_batches += 1
 
@@ -118,13 +130,29 @@ class Net:
                     avg_loss = running_loss / n_batches
                     print(f"Epoch:{epoch} | Batch:{i // batch_size} | Avg Loss:{avg_loss:.4f}")
 
+            epoch_loss = running_loss / n_batches
+            history["train_loss"].append(float(epoch_loss))
+
+            if x_val is not None and y_val is not None:
+                val_acc = self.evaluate(x_val, y_val)
+                history["val_acc"].append(float(val_acc))
+                print(f"Epoch:{epoch} | Train Loss:{epoch_loss:.4f} | Val Acc:{val_acc:.4f}")
+
+            if metrics_file:
+                import json as _json
+                with open(metrics_file, "w") as f:
+                    _json.dump(history, f)
+
+        return history
+
     def predict(self, x):
         if x.ndim == 1:
             x = x.reshape(1, -1)
         return self.forward(x, training=False)
 
     def save_model(self, filepath):
-        model_data = {"layers": self.layers, "t": self.t}
+        dims = [self.layers[0]["W"].shape[0]] + [l["W"].shape[1] for l in self.layers]
+        model_data = {"linears": dims[1:-1], "layers": self.layers, "t": self.t}
         try:
             np.save(filepath, model_data)
             print(f"模型已成功保存到 {filepath}")
@@ -134,10 +162,12 @@ class Net:
     def load_model(self, filepath):
         try:
             model_data = np.load(filepath, allow_pickle=True).item()
-            self.layers = model_data["layers"]
+            saved_layers = model_data["layers"]
+            dims = [saved_layers[0]["W"].shape[0]] + [l["W"].shape[1] for l in saved_layers]
+            self.layers = saved_layers
             self.t = model_data["t"]
             print(f"模型已成功从 {filepath} 加载")
-            print(f"网络层数: {len(self.layers)}")
+            print(f"网络层数: {len(self.layers)}, 架构: {' -> '.join(map(str, dims))}")
             print(f"Adam迭代次数: {self.t}")
         except FileNotFoundError:
             print(f"模型文件不存在: {filepath}")
