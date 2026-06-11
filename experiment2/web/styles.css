@@ -85,17 +85,32 @@ button {
   font: inherit;
 }
 
+input:focus,
+select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+  outline: none;
+}
+
 .row {
   display: grid;
   grid-template-columns: 1fr 100px;
   gap: 10px;
 }
 
+.quick-actions,
 .buttons {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 10px;
-  margin-top: 4px;
+}
+
+.quick-actions {
+  grid-template-columns: repeat(4, 1fr);
+  margin: 4px 0 10px;
+}
+
+.buttons {
+  grid-template-columns: 1fr 1fr;
 }
 
 button {
@@ -110,15 +125,28 @@ button:hover {
   background: var(--primary-dark);
 }
 
-button.secondary {
+button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+button.secondary,
+button.ghost {
   border-color: var(--border);
   background: #fff;
   color: var(--text);
   font-weight: 600;
 }
 
-button.secondary:hover {
+button.secondary:hover,
+button.ghost:hover {
   background: #f1f5f9;
+}
+
+button.ghost {
+  min-width: 0;
+  padding: 0 6px;
+  font-size: 13px;
 }
 
 .status,
@@ -129,10 +157,28 @@ button.secondary:hover {
 
 .panel-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   align-items: center;
   margin-bottom: 20px;
+}
+
+.panel-header.compact {
+  margin-bottom: 14px;
+}
+
+.trace-pill {
+  display: inline-grid;
+  min-width: 72px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #f8fafc;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .step-control {
@@ -143,6 +189,11 @@ button.secondary:hover {
   color: var(--muted);
   font-size: 14px;
   text-align: center;
+}
+
+.step-control button {
+  height: 36px;
+  font-size: 13px;
 }
 
 .board {
@@ -160,6 +211,7 @@ button.secondary:hover {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--tile);
+  color: var(--text);
   font-size: 42px;
   font-weight: 800;
 }
@@ -167,6 +219,11 @@ button.secondary:hover {
 .tile.blank {
   background: var(--blank);
   color: transparent;
+}
+
+.move-label {
+  min-height: 52px;
+  margin: 0;
 }
 
 .stats {
@@ -180,6 +237,7 @@ button.secondary:hover {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px;
+  background: #fff;
 }
 
 .stats span {
@@ -209,10 +267,16 @@ td {
   border-bottom: 1px solid var(--border);
   padding: 9px 6px;
   text-align: left;
+  white-space: nowrap;
 }
 
 th {
   color: var(--muted);
+  font-weight: 700;
+}
+
+.heuristic-name {
+  color: var(--primary);
   font-weight: 700;
 }
 
@@ -224,5 +288,27 @@ th {
   .board {
     grid-template-columns: repeat(3, minmax(80px, 112px));
     grid-template-rows: repeat(3, minmax(80px, 112px));
+  }
+}
+
+@media (max-width: 560px) {
+  .layout {
+    padding: 10px;
+  }
+
+  .quick-actions,
+  .buttons,
+  .row,
+  .stats {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-header {
+    align-items: stretch;
+  }
+
+  .step-control {
+    grid-template-columns: 1fr;
+    width: 100%;
   }
 }

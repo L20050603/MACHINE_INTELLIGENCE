@@ -46,6 +46,13 @@
           <input id="maxExpanded" type="number" min="1" value="200000" />
         </label>
 
+        <div class="quick-actions">
+          <button id="randomStartBtn" class="ghost">随机初态</button>
+          <button id="randomPairBtn" class="ghost">随机任务</button>
+          <button id="swapBtn" class="ghost">交换</button>
+          <button id="resetBtn" class="ghost">重置</button>
+        </div>
+
         <div class="buttons">
           <button id="solveBtn">求解</button>
           <button id="compareBtn" class="secondary">对比启发函数</button>
@@ -69,7 +76,10 @@
       </section>
 
       <section class="panel result-panel">
-        <h2>搜索统计</h2>
+        <div class="panel-header compact">
+          <h2>搜索统计</h2>
+          <span id="modeBadge" class="trace-pill">READY</span>
+        </div>
         <div class="stats">
           <div><span>是否找到</span><strong id="found">-</strong></div>
           <div><span>步数</span><strong id="depth">-</strong></div>
